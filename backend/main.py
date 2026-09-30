@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from app.api import freshness, storage
+from app.api import freshness, storage, analytics, inventory
 import os
 
 app = FastAPI(title="Food Freshness Monitoring Platform API")
@@ -23,6 +23,8 @@ app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
 # Include Routers
 app.include_router(freshness.router, prefix="/api/v1/freshness", tags=["Freshness"])
 app.include_router(storage.router, prefix="/api/v1/storage", tags=["Storage"])
+app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
+app.include_router(inventory.router, prefix="/api/v1/inventory", tags=["Inventory"])
 
 @app.get("/")
 def root():
