@@ -96,7 +96,6 @@ export default function DashboardLayout({ children }) {
               <Calendar size={16} /> Last 30 Days <ChevronDown size={16} />
             </div>
             <button className="icon-btn"><Bell size={18}/><span className="notification-dot"></span></button>
-            <button className="btn-copilot"><Sparkles size={16}/> Copilot AI</button>
             <div className="header-avatar">EV</div>
           </div>
         </header>

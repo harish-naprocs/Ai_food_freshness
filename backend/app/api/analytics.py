@@ -1,13 +1,25 @@
 from fastapi import APIRouter
 from typing import Dict, Any
+from app.services.metrics import metrics_service
 
 router = APIRouter()
+
+@router.get("/performance")
+def get_system_performance_metrics() -> Dict[str, Any]:
+    """
+    Returns dynamically aggregated system performance metrics from the database.
+    Matches milestone requirements for assessing the AI prediction engine's accuracy.
+    """
+    return metrics_service.get_performance_metrics()
 
 @router.get("/dashboard")
 def get_dashboard_analytics() -> Dict[str, Any]:
     """
     Provides aggregated metrics for the Executive Overview Dashboard.
     """
+    # Fetching real metrics to populate the dashboard dynamically
+    perf = metrics_service.get_performance_metrics()
+    
     return {
         "kpis": {
             "total_inventory": 12480,
@@ -15,7 +27,7 @@ def get_dashboard_analytics() -> Dict[str, Any]:
             "at_risk_inventory": 1284,
             "near_spoilage": 428,
             "waste_prevented": 480000,
-            "freshness_score": 82
+            "freshness_score": perf["freshness_assessment"]["scoring_consistency_score"]
         },
         "health_trend": [
             { "name": "Day 1", "fresh": 95, "good": 80, "acceptable": 60, "risk": 20 },
@@ -64,25 +76,25 @@ def get_dashboard_analytics() -> Dict[str, Any]:
         ],
         "insights": [
             {
+                "type": "SYSTEM PERFORMANCE",
+                "level": "success",
+                "time": "System Data",
+                "description": f"AI Shelf-Life forecast operating at {perf['shelf_life_prediction']['forecast_accuracy_percent']}% accuracy with MAE of {perf['shelf_life_prediction']['mean_absolute_error_days']} days.",
+                "action": "View Model Diagnostics"
+            },
+            {
+                "type": "WASTE REDUCTION IMPACT",
+                "level": "success",
+                "time": "System Data",
+                "description": f"Recommendation engine has successfully reduced {perf['recommendations']['waste_reduction_effectiveness_kg']} kg of waste this period.",
+                "action": None
+            },
+            {
                 "type": "CRITICAL SPOILAGE ALERT",
                 "level": "danger",
                 "time": "Just now",
                 "description": "14 batches show elevated spoilage risk across Cold Storage C due to micro-climate variance. Estimated loss potential: ₹1.2L.",
                 "action": "Authorize Emergency Cooling"
-            },
-            {
-                "type": "FEFO ROTATION PROTOCOL",
-                "level": "warning",
-                "time": "42m ago",
-                "description": "312 items of Dairy SKU-092 should be rotated to retail front within 48 hours to prevent markdown losses.",
-                "action": "Push Work Order to Bay Staff"
-            },
-            {
-                "type": "QUALITY CONFIDENCE",
-                "level": "success",
-                "time": "1h ago",
-                "description": "Tomato batch TOM-BCH-01 exhibits 94.7% CV freshness confidence. Safe for premium grade retail dispatch with zero deduction risk.",
-                "action": None
             }
         ]
     }

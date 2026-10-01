@@ -31,26 +31,6 @@ export default function Dashboard() {
   if (loading || !data) {
     return <div style={{padding: '3rem', textAlign: 'center'}}>Loading AI Analytics...</div>;
   }
-  const [activeMenu, setActiveMenu] = useState('Overview');
-
-  const menuItems = [
-    { icon: LayoutDashboard, label: 'Overview' },
-    { icon: Activity, label: 'AI Freshness' },
-    { icon: Package, label: 'Inventory' },
-    { icon: Layers, label: 'Batches & Traceability' },
-    { icon: LineChart, label: 'Shelf-Life Intelligence' },
-    { icon: Sparkles, label: 'AI Recommendations' },
-    { icon: AlertCircle, label: 'Alerts & Exceptions', badge: '8' },
-    { icon: FileText, label: 'Reports Center' },
-    { icon: BarChart2, label: 'Freshness Analytics' }
-  ];
-
-  const adminItems = [
-    { icon: ShieldCheck, label: 'Quality Inspectors' },
-    { icon: Users, label: 'Users & Roles' },
-    { icon: FileText, label: 'Audit Logs' },
-    { icon: Settings, label: 'System Health' }
-  ];
 
   return (
     <div className="dashboard-body">
