@@ -65,23 +65,41 @@ export default function AIFreshness() {
     
     const imageData = ctx.getImageData(0, 0, 224, 224).data;
     let darkPixels = 0;
+    let brownRotPixels = 0;
     let brightPixels = 0;
+    let foregroundPixels = 0;
     
     for (let i = 0; i < imageData.length; i += 4) {
       const r = imageData[i];
       const g = imageData[i + 1];
       const b = imageData[i + 2];
-      // Human perception luminance calculation
+      const a = imageData[i + 3];
+      
+      // Ignore transparent or near pure white background (r>240, g>240, b>240)
+      if (a < 100 || (r > 240 && g > 240 && b > 240)) {
+        continue;
+      }
+      
+      foregroundPixels++;
       const luminance = 0.299 * r + 0.587 * g + 0.114 * b; 
       
-      // Rot / Bruising / Spoilage typically registers as low luminance
-      if (luminance < 75) darkPixels++;
-      // Fresh, vibrant skin typically registers high luminance
-      if (luminance > 140) brightPixels++;
+      // Rot / Bruising / Necrotic Brown decay detection
+      // Brown/decay is characterized by low luminance or brownish tint (r > b and low g)
+      const isBrownDecay = (r > 60 && r < 160) && (g > 30 && g < 120) && (b < 80) && (r > g);
+      if (luminance < 85 || isBrownDecay) {
+        darkPixels++;
+      }
+      if (isBrownDecay) {
+        brownRotPixels++;
+      }
+      if (luminance > 140) {
+        brightPixels++;
+      }
     }
     
-    const darkRatio = darkPixels / (224 * 224);
-    const brightRatio = brightPixels / (224 * 224);
+    const validFg = Math.max(foregroundPixels, 1000);
+    const darkRatio = darkPixels / validFg;
+    const brightRatio = brightPixels / validFg;
     // -------------------------------------------------------------
 
     const formData = new FormData();
@@ -164,6 +182,16 @@ export default function AIFreshness() {
               <label className="check-label"><input type="checkbox" defaultChecked /> Bounding Boxes</label>
               <label className="check-label"><input type="checkbox" defaultChecked /> NDVI</label>
             </div>
+            <div className="control-group" style={{marginLeft: 'auto', display: 'flex', gap: '0.5rem'}}>
+              {preview && (
+                <button className="btn-control active" onClick={resetScan} style={{background: '#fef2f2', borderColor: '#fca5a5', color: '#b91c1c'}}>
+                  <RefreshCw size={13}/> Re-Scan
+                </button>
+              )}
+              <button className="btn-control" onClick={() => fileInputRef.current?.click()}>
+                <Upload size={13}/> Choose Image
+              </button>
+            </div>
           </div>
 
           {error && (
@@ -175,18 +203,28 @@ export default function AIFreshness() {
           <div className="feed-image-container">
             <img src={displayImage} alt="Analysis Feed" className="feed-img" />
             
-            {/* Mock Bounding Boxes (Only show if analyzed) */}
-            {analyzed && (
+            {/* Bounding Boxes (Only show if analyzed and bounding boxes checkbox enabled) */}
+            {analyzed && result && (
               <>
-                <div className="bounding-box primary" style={{top: '30%', left: '40%', width: '150px', height: '120px'}}>
-                  <div className="box-label">Region: Calyx Hydration (96.2% Turgid)</div>
-                </div>
-                <div className="bounding-box secondary" style={{top: '50%', left: '20%', width: '180px', height: '140px'}}>
-                  <div className="box-label">Region: Skin Pericarp (98.3% Intact)</div>
-                </div>
-                <div className="bounding-box target" style={{top: '45%', left: '65%', width: '100px', height: '100px'}}>
-                  <div className="box-label">Synergistic Texture: 94/100</div>
-                </div>
+                {result.freshness_score < 50 ? (
+                  <>
+                    <div className="bounding-box primary" style={{top: '25%', left: '35%', width: '180px', height: '160px', borderColor: '#ef4444'}}>
+                      <div className="box-label" style={{backgroundColor: '#ef4444', color: 'white'}}>Region: Spoilage / Decay Necrosis</div>
+                    </div>
+                    <div className="bounding-box target" style={{top: '50%', left: '55%', width: '120px', height: '110px', borderColor: '#f97316'}}>
+                      <div className="box-label" style={{backgroundColor: '#f97316', color: 'white'}}>Texture Loss: {Math.round(result.sub_scores?.texture || result.freshness_score)}/100</div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="bounding-box primary" style={{top: '30%', left: '35%', width: '160px', height: '140px', borderColor: '#10b981'}}>
+                      <div className="box-label" style={{backgroundColor: '#10b981', color: '#0f172a'}}>Region: Pericarp Intact ({Math.round(result.sub_scores?.surface || result.freshness_score)}%)</div>
+                    </div>
+                    <div className="bounding-box target" style={{top: '45%', left: '60%', width: '110px', height: '100px', borderColor: '#3b82f6'}}>
+                      <div className="box-label" style={{backgroundColor: '#3b82f6', color: 'white'}}>Texture Grade: {Math.round(result.sub_scores?.texture || result.freshness_score)}/100</div>
+                    </div>
+                  </>
+                )}
               </>
             )}
 
@@ -242,17 +280,47 @@ export default function AIFreshness() {
         <div className="vision-diagnostics">
           <div className="diag-header">
             <div className="dh-title"><Activity size={18} className="text-primary"/> Freshness Index</div>
-            <span className="badge-optimal"><span className="dot success"></span> FRESH (OPTIMAL)</span>
+            {analyzed && result ? (
+              <span className={result.freshness_score >= 70 ? "badge-optimal" : result.freshness_score >= 40 ? "badge-warning" : "badge-danger"}
+                style={{
+                  background: result.freshness_score >= 70 ? '#ecfdf5' : result.freshness_score >= 40 ? '#fefce8' : '#fef2f2',
+                  color: result.freshness_score >= 70 ? '#047857' : result.freshness_score >= 40 ? '#ca8a04' : '#b91c1c',
+                  padding: '4px 10px',
+                  borderRadius: '50px',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.4rem'
+                }}
+              >
+                <span className="dot" style={{ background: result.freshness_score >= 70 ? '#10b981' : result.freshness_score >= 40 ? '#eab308' : '#ef4444' }}></span>
+                {result.classification ? result.classification.toUpperCase() : 'UNKNOWN'}
+              </span>
+            ) : (
+              <span className="badge-optimal" style={{background: '#f1f5f9', color: '#64748b'}}>
+                <span className="dot" style={{background: '#94a3b8'}}></span> AWAITING SCAN
+              </span>
+            )}
           </div>
 
           <div className="index-hero">
-            <div className="index-circle">
+            <div 
+              className="index-circle"
+              style={{
+                borderColor: !analyzed || !result ? '#cbd5e1' : result.freshness_score >= 70 ? '#10b981' : result.freshness_score >= 40 ? '#f59e0b' : '#ef4444'
+              }}
+            >
               <h2>{analyzed && result ? Math.round(result.freshness_score) : '--'}</h2>
               <span>/ 100</span>
             </div>
             <div className="index-info">
               <span className="text-muted font-small uppercase">Automated Classification</span>
-              <h3>{analyzed && result ? result.classification : '--'}</h3>
+              <h3 style={{
+                color: !analyzed || !result ? '#0f172a' : result.freshness_score >= 70 ? '#047857' : result.freshness_score >= 40 ? '#b45309' : '#b91c1c'
+              }}>
+                {analyzed && result ? result.classification : '--'}
+              </h3>
               <p className="font-small text-muted">Model Version: <strong className="text-primary">{analyzed && result ? result.model_version : 'N/A'}</strong></p>
             </div>
           </div>
@@ -260,19 +328,19 @@ export default function AIFreshness() {
           <div className="diag-grid">
             <div className="diag-item">
               <span className="text-muted font-small uppercase">Confidence</span>
-              <strong>{analyzed && result ? `${(result.confidence * 100).toFixed(1)}%` : '--'}</strong>
+              <strong>{analyzed && result ? `${(result.confidence > 1 ? result.confidence : result.confidence * 100).toFixed(1)}%` : '--'}</strong>
               <span className="text-muted font-small">AI Certainty</span>
             </div>
             <div className="diag-item">
               <span className="text-muted font-small uppercase">Spoilage Detection</span>
-              <strong className={analyzed && result && result.spoilage_status !== 'No Spoilage Detected' ? 'text-danger' : ''}>
+              <strong className={analyzed && result && result.spoilage_status !== 'No Spoilage Detected' ? 'text-danger' : 'text-success'}>
                 {analyzed && result ? (result.spoilage_status === 'No Spoilage Detected' ? 'Clear' : 'Detected') : '--'}
               </strong>
               <span className="text-muted font-small">Visual Markers</span>
             </div>
             <div className="diag-item">
               <span className="text-muted font-small uppercase">Quality Grade</span>
-              <strong>{analyzed && result ? (result.freshness_score >= 80 ? 'Grade A' : result.freshness_score >= 60 ? 'Grade B' : 'Grade C') : '--'}</strong>
+              <strong>{analyzed && result ? (result.freshness_score >= 80 ? 'Grade A' : result.freshness_score >= 60 ? 'Grade B' : result.freshness_score >= 35 ? 'Grade C' : 'Grade D') : '--'}</strong>
               <span className="text-muted font-small">Based on Score</span>
             </div>
             <div className="diag-item">
@@ -289,24 +357,24 @@ export default function AIFreshness() {
             </div>
             
             <div className="sb-row">
-              <div className="sb-label"><span>Visual Condition</span> <span>{analyzed ? '92%' : '--'}</span></div>
-              <div className="progress-bar"><div className="fill success" style={{width: analyzed ? '92%' : '0%'}}></div></div>
+              <div className="sb-label"><span>Visual Condition</span> <span>{analyzed && result ? `${Math.round(result.sub_scores?.surface || result.freshness_score)}%` : '--'}</span></div>
+              <div className="progress-bar"><div className={`fill ${result && result.freshness_score < 50 ? 'danger' : 'success'}`} style={{width: analyzed && result ? `${Math.min(100, Math.round(result.sub_scores?.surface || result.freshness_score))}%` : '0%', background: result && result.freshness_score < 50 ? '#ef4444' : '#10b981'}}></div></div>
             </div>
             <div className="sb-row">
-              <div className="sb-label"><span>Color Integrity</span> <span>{analyzed ? '95%' : '--'}</span></div>
-              <div className="progress-bar"><div className="fill success" style={{width: analyzed ? '95%' : '0%'}}></div></div>
+              <div className="sb-label"><span>Color Integrity</span> <span>{analyzed && result ? `${Math.round(result.sub_scores?.color || result.freshness_score)}%` : '--'}</span></div>
+              <div className="progress-bar"><div className={`fill ${result && result.freshness_score < 50 ? 'danger' : 'success'}`} style={{width: analyzed && result ? `${Math.min(100, Math.round(result.sub_scores?.color || result.freshness_score))}%` : '0%', background: result && result.freshness_score < 50 ? '#ef4444' : '#10b981'}}></div></div>
             </div>
             <div className="sb-row">
-              <div className="sb-label"><span>Texture Integrity</span> <span>{analyzed ? '89%' : '--'}</span></div>
-              <div className="progress-bar"><div className="fill success" style={{width: analyzed ? '89%' : '0%'}}></div></div>
+              <div className="sb-label"><span>Texture Integrity</span> <span>{analyzed && result ? `${Math.round(result.sub_scores?.texture || result.freshness_score)}%` : '--'}</span></div>
+              <div className="progress-bar"><div className={`fill ${result && result.freshness_score < 50 ? 'danger' : 'success'}`} style={{width: analyzed && result ? `${Math.min(100, Math.round(result.sub_scores?.texture || result.freshness_score))}%` : '0%', background: result && result.freshness_score < 50 ? '#ef4444' : '#10b981'}}></div></div>
             </div>
             <div className="sb-row">
-              <div className="sb-label"><span>Surface Condition</span> <span>{analyzed ? '94%' : '--'}</span></div>
-              <div className="progress-bar"><div className="fill success" style={{width: analyzed ? '94%' : '0%'}}></div></div>
+              <div className="sb-label"><span>Surface Condition</span> <span>{analyzed && result ? `${Math.round(result.sub_scores?.surface || result.freshness_score)}%` : '--'}</span></div>
+              <div className="progress-bar"><div className={`fill ${result && result.freshness_score < 50 ? 'danger' : 'success'}`} style={{width: analyzed && result ? `${Math.min(100, Math.round(result.sub_scores?.surface || result.freshness_score))}%` : '0%', background: result && result.freshness_score < 50 ? '#ef4444' : '#10b981'}}></div></div>
             </div>
             <div className="sb-row">
-              <div className="sb-label"><span>Physical Condition</span> <span>{analyzed ? '91%' : '--'}</span></div>
-              <div className="progress-bar"><div className="fill success" style={{width: analyzed ? '91%' : '0%'}}></div></div>
+              <div className="sb-label"><span>Physical Condition</span> <span>{analyzed && result ? `${Math.round(result.sub_scores?.damage || result.freshness_score)}%` : '--'}</span></div>
+              <div className="progress-bar"><div className={`fill ${result && result.freshness_score < 50 ? 'danger' : 'success'}`} style={{width: analyzed && result ? `${Math.min(100, Math.round(result.sub_scores?.damage || result.freshness_score))}%` : '0%', background: result && result.freshness_score < 50 ? '#ef4444' : '#10b981'}}></div></div>
             </div>
           </div>
 

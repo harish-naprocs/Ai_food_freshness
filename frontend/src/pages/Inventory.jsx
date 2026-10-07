@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, RefreshCw, Filter, Package, AlertTriangle, TrendingUp, CheckCircle2, Search, SlidersHorizontal, Settings2, Zap } from 'lucide-react';
+import { Download, RefreshCw, Filter, Package, AlertTriangle, AlertCircle, TrendingUp, CheckCircle2, Search, SlidersHorizontal, Settings2, Zap } from 'lucide-react';
 import './Inventory.css';
 
 export default function Inventory() {

@@ -11,20 +11,20 @@ class FreshnessModel:
             # from the image on the client-side. This guarantees 100% real-world accuracy
             # based on the actual image uploaded, completely bypassing dependency issues.
             
-            if dark_ratio > 0.15:
-                # Significant bruising, rot, or darkening detected
+            if dark_ratio > 0.08:
+                # Significant bruising, rot, necrotic decay detected
                 classification = "Spoiled"
-                confidence = min(0.99, 0.70 + (dark_ratio * 1.5))
-            elif dark_ratio > 0.05:
+                confidence = min(0.99, 0.75 + (dark_ratio * 1.5))
+            elif dark_ratio > 0.04:
                 classification = "Near Spoilage"
-                confidence = min(0.95, 0.60 + (dark_ratio * 2.0))
-            elif bright_ratio > 0.20:
-                # Highly vibrant/bright skin with minimal darkening
+                confidence = min(0.95, 0.65 + (dark_ratio * 2.0))
+            elif bright_ratio > 0.35 and dark_ratio < 0.03:
+                # Highly vibrant skin with almost zero darkening
                 classification = "Fresh"
-                confidence = min(0.99, 0.50 + bright_ratio)
+                confidence = min(0.99, 0.60 + bright_ratio)
             else:
-                # Normal or acceptable levels
-                classification = "Good"
+                # Moderate quality/acceptable
+                classification = "Acceptable"
                 confidence = 0.85
             
             spoilage_detected = (classification == "Spoiled" or classification == "Near Spoilage")
